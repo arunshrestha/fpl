@@ -1,0 +1,22 @@
+name: 'fpl'
+version: '1.0.0'
+
+profile: 'fpl'   # must match profile name in profiles.yml
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  fpl:
+    staging:
+      +schema: "{{ env_var('STAGING_SCHEMA') }}"
+    marts:
+      +schema: "{{ env_var('MART_SCHEMA') }}"

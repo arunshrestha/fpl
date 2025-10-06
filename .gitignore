@@ -1,0 +1,61 @@
+# Ignore data files
+*.csv
+data/
+
+# (Optionally) ignore all notebooks except specific ones
+*.ipynb
+# !notebooks/analysis_report.ipynb
+
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+.env.*
+.env
+
+# Local databases / temporary files
+*.db
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# DBT artifacts
+dbt/target/
+dbt/dbt_packages/
+dbt/.dbt/
+
+# Logs
+*.log
+config/logging.conf
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Optional: cache folders
+.cache/
+pip-wheel-metadata/
+__pypackages__/
+
+# Test outputs / coverage
+htmlcov/
+.coverage
+.tox/
+.nox/
+pytest_cache/
+.pytest_cache/

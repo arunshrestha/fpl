@@ -1,0 +1,7 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: "{{ env_var('RAW_SCHEMA') }}" 
+    tables:
+      - name: fixtures

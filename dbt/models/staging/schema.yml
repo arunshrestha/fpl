@@ -1,0 +1,13 @@
+version: 2
+
+models:
+  - name: stg_fixtures
+    description: "Staging table for fixtures"
+    columns:
+      - name: fixture_id
+        tests:
+          - not_null
+          - unique
+      - name: gameweek_id
+        tests:
+          - not_null
