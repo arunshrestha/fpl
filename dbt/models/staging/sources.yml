@@ -5,3 +5,4 @@ sources:
     schema: "{{ env_var('RAW_SCHEMA') }}" 
     tables:
       - name: fixtures
+      - name: bootstrap_static

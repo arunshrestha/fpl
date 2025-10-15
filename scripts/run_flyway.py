@@ -16,7 +16,7 @@ def run_flyway(command: str = "migrate", env: str = "dev"):
     load_dotenv(env_file)
 
     # Prevent flyway clean in production
-    if command == "clean" and env == "prod":
+    if command == "clean" and env != "dev":
         raise SystemExit("Flyway clean is disabled in production!")
 
     flyway_conf = project_root / "db/flyway/conf/flyway.conf"

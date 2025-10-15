@@ -1,6 +1,14 @@
 import pandas as pd
 from typing import Dict, List
 import logging
+from .utils import serialize_json_columns
+
+def transform_bootstrap_static(payload: dict) -> pd.DataFrame:
+    """
+    Return a single-row DataFrame with the raw payload under column 'data'.
+    Upstream loader will serialize the 'data' column to JSONB.
+    """
+    return pd.DataFrame([{"data": payload}])
 
 def transform_teams(teams_data: List[Dict]) -> pd.DataFrame:
     """Transforms raw teams data into a standardized DataFrame."""
@@ -62,26 +70,30 @@ def transform_players(players_data: list[Dict], teams_map: dict) -> pd.DataFrame
     df['team'] = df['team'].map(teams_map)
     return df
 
-# def transform_fixtures(fixtures_data: list[Dict], teams_map: dict) -> pd.DataFrame:
-def transform_fixtures(fixtures_data: list[Dict]) -> pd.DataFrame:
-    # df = pd.DataFrame(fixtures_data)
-    # df = df[['id', 'event_id', 'team_h', 'team_a', 'team_h_difficulty', 'team_a_difficulty', 'kickoff_time']]
-    # # df['team_h'] = df['team_h'].map(teams_map)
-    # # df['team_a'] = df['team_a'].map(teams_map)
-    # # df.rename(columns={'id': 'fixture_id', 'event': 'gameweek_id'}, inplace=True)
-    # return df
-
+def transform_fixtures(fixtures_data: List[Dict]) -> pd.DataFrame:
+    """
+    Prepare raw fixtures data for direct loading into the raw schema.
+    No cleaning or renaming—just select columns as-is.
+    """
+    expected_cols = [
+        'code', 'event', 'finished', 'finished_provisional', 'id',
+        'kickoff_time', 'minutes', 'provisional_start_time', 'started',
+        'team_a', 'team_a_score', 'team_h', 'team_h_score', 'stats',
+        'team_h_difficulty', 'team_a_difficulty', 'pulse_id'
+    ]
     try:
         df = pd.DataFrame(fixtures_data)
-        expected_cols = ['id', 'event', 'team_h', 'team_a', 'team_h_difficulty', 'team_a_difficulty', 'kickoff_time']
+        # Ensure all expected columns are present
         for col in expected_cols:
             if col not in df.columns:
                 df[col] = None
         df = df[expected_cols]
+        df = serialize_json_columns(df, ['stats'])
         return df
     except Exception as e:
-        logging.error(f"Error transforming teams: {e}")
-        return pd.DataFrame()
+        logging.error(f"[transform_fixtures] Error: {e}")
+        return pd.DataFrame(columns=expected_cols)
+
 
 def transform_player_history(player_id: int, web_name: str, history_data: dict) -> pd.DataFrame:
     """Transform current season history of a player into a DataFrame."""

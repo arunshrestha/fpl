@@ -11,3 +11,17 @@ models:
       - name: gameweek_id
         tests:
           - not_null
+  - name: stg_fixture_stats
+    description: "Flattened fixture stats from raw.fixtures"
+    columns:
+      - name: fixture_id
+        tests:
+          - not_null
+      - name: stat_identifier
+        tests:
+          - not_null
+      - name: team_type
+      - name: player_id
+        tests:
+          - not_null
+      - name: stat_value
