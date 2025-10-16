@@ -42,6 +42,27 @@ This project uses a robust, layered approach for data management and transformat
   python scripts/run_dbt.py run --env dev
   python scripts/run_dbt.py run --env prod
   ```
+  - Run full transform:
+    - python scripts/run_dbt.py run --env dev
+  - Run a single model:
+    - python scripts/run_dbt.py run --select stg_gameweeks --env dev
+  - Run tests:
+    - all tests: python scripts/run_dbt.py test --env dev
+    - model tests only: python scripts/run_dbt.py test --select stg_gameweeks --env dev
+    - data-only: python scripts/run_dbt.py test --select stg_gameweeks --data --env dev
+    - schema-only: python scripts/run_dbt.py test --select stg_gameweeks --schema --env dev
+  - Notes:
+    - Use the `--select` selector to limit scope and avoid running the whole project.
+    - The run_dbt wrapper loads the appropriate `.env.<env>` and points DBT_PROFILES_DIR to the local `dbt` folder.
+    - Pass extra dbt CLI args after `--` if needed (e.g. `-- --threads 4`).
+---
+## Staging conventions
+
+- Staging models: canonical, typed representation of raw JSON with:
+  - scalar fields extracted and cast
+  - original json/jsonb retained for audit
+  - repeating arrays normalized to one-row-per-parent+element models (e.g., `stg_gameweek_chip_plays`)
+- Mart models: business-facing denormalizations, pivots, aggregations.
 
 ---
 

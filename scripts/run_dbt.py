@@ -3,32 +3,75 @@ import sys
 import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
+import argparse
+import shlex
 
-def run_dbt(command: str = "run", env: str = "dev"):
-    """
-    Run a dbt CLI command using a project-local profiles.yml and environment variables from .env.{env}.
-    Usage: python run_dbt.py run --env dev
-    """
-    # Project root
+def build_dbt_cmd(command: str, args) -> list:
+    cmd = ["dbt", command]
+
+    if args.select:
+        cmd += ["--select", args.select]
+    elif args.models:
+        cmd += ["--select", args.models]
+
+    if args.threads:
+        cmd += ["--threads", str(args.threads)]
+
+    if args.data:
+        cmd += ["--data"]
+    if args.schema:
+        cmd += ["--schema"]
+
+    if args.full_refresh:
+        cmd += ["--full-refresh"]
+
+    if args.vars:
+        cmd += ["--vars", args.vars]
+
+    # append extra dbt args passed after --, but strip any script-level flags
+    if args.dbt_args:
+        extra = list(args.dbt_args)
+        if extra and extra[0] == "--":
+            extra = extra[1:]
+
+        # remove script/internal flags (and their values) that should not be forwarded to dbt
+        internal_flags_with_value = {"--env", "-e"}
+        cleaned = []
+        i = 0
+        while i < len(extra):
+            tok = extra[i]
+            if tok in internal_flags_with_value:
+                # skip this flag and the next token if it's a value (not another flag)
+                if i + 1 < len(extra) and not extra[i + 1].startswith("-"):
+                    i += 2
+                else:
+                    i += 1
+                continue
+            cleaned.append(tok)
+            i += 1
+
+        cmd += cleaned
+
+    return cmd
+
+def run_dbt(command: str, env: str, dbt_cmd: list | None = None):
     project_root = Path(os.getenv("FPL_PROJECT_ROOT", Path(__file__).resolve().parent.parent))
 
-    # Load environment variables from .env.{env}
     env_path = project_root / f".env.{env}"
     if not env_path.exists():
         raise FileNotFoundError(f".env.{env} file not found at {env_path}")
     load_dotenv(env_path)
 
-    # dbt project folder
     dbt_dir = project_root / "dbt"
-
-    # Use project-local profiles.yml
     dbt_env = os.environ.copy()
     dbt_env["DBT_PROFILES_DIR"] = str(dbt_dir)
 
-    # Build dbt command
-    dbt_cmd = ["dbt"] + command.split()
+    if dbt_cmd is None:
+        dbt_cmd = ["dbt", command]
 
-    # Run dbt
+    # don't forward script-level env flag in the printed command
+    printable = " ".join(shlex.quote(p) for p in dbt_cmd)
+    print("Running:", printable)
     result = subprocess.run(
         dbt_cmd,
         env=dbt_env,
@@ -37,23 +80,28 @@ def run_dbt(command: str = "run", env: str = "dev"):
         text=True
     )
 
-    # Print stdout
     print(result.stdout)
-
-    # Handle errors
     if result.returncode != 0:
         print(result.stderr)
         raise SystemExit(f"dbt {command} failed with code {result.returncode}")
 
+def main(argv):
+    parser = argparse.ArgumentParser(description="Run dbt with project-local profiles and .env.<env>.")
+    parser.add_argument("command", nargs="?", default="run", help="dbt command (run|test|compile|seed|snapshot|docs|ls)")
+    parser.add_argument("--env", "-e", default="dev", help=".env file suffix (default: dev)")
+    parser.add_argument("--select", "-s", help="dbt --select selector (e.g. stg_gameweeks+)")
+    parser.add_argument("--models", "-m", help="alias for --select")
+    parser.add_argument("--threads", "-t", type=int, help="dbt --threads value")
+    parser.add_argument("--data", action="store_true", help="pass --data to dbt test")
+    parser.add_argument("--schema", action="store_true", help="pass --schema to dbt test")
+    parser.add_argument("--full-refresh", action="store_true", help="pass --full-refresh to dbt run")
+    parser.add_argument("--vars", "-v", help="vars YAML/JSON string to pass to dbt (--vars '{...}')")
+    parser.add_argument("dbt_args", nargs=argparse.REMAINDER, help="extra dbt CLI args (place after --)")
+
+    args = parser.parse_args(argv)
+
+    dbt_cmd = build_dbt_cmd(args.command, args)
+    run_dbt(args.command, args.env, dbt_cmd)
+
 if __name__ == "__main__":
-    # Parse command and environment from CLI arguments
-    cmd = "run"
-    env = "dev"
-    args = sys.argv[1:]
-    if args:
-        cmd = args[0]
-        if "--env" in args:
-            env_idx = args.index("--env")
-            if len(args) > env_idx + 1:
-                env = args[env_idx + 1]
-    run_dbt(cmd, env)
+    main(sys.argv[1:])

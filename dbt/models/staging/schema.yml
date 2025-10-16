@@ -1,6 +1,7 @@
 version: 2
 
 models:
+
   - name: stg_fixtures
     description: "Staging table for fixtures"
     columns:
@@ -11,6 +12,7 @@ models:
       - name: gameweek_id
         tests:
           - not_null
+
   - name: stg_fixture_stats
     description: "Flattened fixture stats from raw.fixtures"
     columns:
@@ -25,3 +27,102 @@ models:
         tests:
           - not_null
       - name: stat_value
+
+  - name: stg_gameweeks
+    description: "Staged gameweek (events) from bootstrap_static"
+    columns:
+      - name: gameweek_id
+        tests: [unique, not_null]
+
+      - name: gameweek_name
+        tests: [not_null]
+
+      - name: deadline_time
+        tests: [not_null]
+
+      - name: average_entry_score
+        tests: []
+
+      - name: finished
+        tests: []
+
+      - name: data_checked
+        tests: []
+
+      - name: highest_score
+        tests: []
+
+      - name: deadline_time_epoch
+        tests: []
+
+      - name: is_previous
+        tests: []
+
+      - name: is_current
+        tests: []
+
+      - name: is_next
+        tests: []
+
+      - name: ranked_count
+        tests: []
+
+      - name: transfers_made
+        tests: []
+
+      - name: most_selected_player_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_players')
+                field: id
+
+      - name: most_transferred_in_player_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_players')
+                field: id
+
+      - name: most_captained_player_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_players')
+                field: id
+
+      - name: most_vice_captained_player_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_players')
+                field: id
+
+      - name: top_player_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_players')
+                field: id
+
+      - name: top_element_info
+        description: "jsonb; retained for audit"
+
+      - name: chip_plays
+        description: "jsonb array; retained for audit"
+
+  - name: stg_gameweek_chip_plays
+    description: "Normalized chip plays; one row per gameweek + chip"
+    columns:
+      - name: gameweek_id
+        tests:
+          - not_null
+      - name: chip_name
+        tests:
+          - not_null
+      - name: num_played
+        tests:
+          - not_null
+    # tests:
+    #   - dbt_utils.expression_is_true:
+    #       expression: "num_played >= 0"
