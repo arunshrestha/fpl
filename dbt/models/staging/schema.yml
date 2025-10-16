@@ -126,3 +126,47 @@ models:
     # tests:
     #   - dbt_utils.expression_is_true:
     #       expression: "num_played >= 0"
+  
+  - name: stg_player_positions
+    description: "Staged player positions (element_types)"
+    columns:
+      - name: player_position_id
+        tests:
+          - unique
+          - not_null
+
+      - name: player_position_singular_name
+        tests:
+          - not_null
+
+      - name: player_position_singular_name_short
+        tests:
+          - not_null
+
+      - name: player_position_plural_name
+        tests: []
+
+      - name: player_position_plural_name_short
+        tests: []
+
+      - name: squad_select
+        tests:
+          - not_null
+
+      - name: squad_min_select
+        tests: []
+
+      - name: squad_max_select
+        tests: []
+
+      - name: squad_min_play
+        tests:
+          - not_null
+
+      - name: squad_max_play
+        tests:
+          - not_null
+
+      - name: element_count
+        tests:
+          - not_null
