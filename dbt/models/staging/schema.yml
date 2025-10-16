@@ -170,3 +170,72 @@ models:
       - name: element_count
         tests:
           - not_null
+
+  - name: stg_teams
+    description: "Staged teams from bootstrap_static"
+    columns:
+      - name: team_id
+        tests:
+          - unique
+          - not_null
+
+      - name: code
+        tests:
+          - not_null
+
+      - name: team_name
+        tests:
+          - not_null
+
+      - name: team_short_name
+        tests:
+          - not_null
+
+      - name: team_position
+        tests: []  # nullable at season start
+
+      - name: played
+        tests:
+          - not_null
+
+      - name: wins
+        tests:
+          - not_null
+
+      - name: draws
+        tests:
+          - not_null
+
+      - name: losses
+        tests:
+          - not_null
+
+      - name: points
+        tests:
+          - not_null
+
+      - name: strength
+        tests:
+          - not_null
+
+      - name: pulse_id
+        tests:
+          - not_null
+
+      - name: strength_overall_home
+        tests: []
+
+      - name: strength_overall_away
+        tests: []
+
+      - name: strength_attack_home
+        tests: []
+
+      - name: strength_attack_away
+        tests: []
+
+      - name: strength_defence_home
+        tests: []
+
+      - name: strength_defence_away
+        tests: []
