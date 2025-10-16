@@ -75,35 +75,35 @@ models:
           - relationships:
               arguments:
                 to: ref('stg_players')
-                field: id
+                field: player_id
 
       - name: most_transferred_in_player_id
         tests:
           - relationships:
               arguments:
                 to: ref('stg_players')
-                field: id
+                field: player_id
 
       - name: most_captained_player_id
         tests:
           - relationships:
               arguments:
                 to: ref('stg_players')
-                field: id
+                field: player_id
 
       - name: most_vice_captained_player_id
         tests:
           - relationships:
               arguments:
                 to: ref('stg_players')
-                field: id
+                field: player_id
 
       - name: top_player_id
         tests:
           - relationships:
               arguments:
                 to: ref('stg_players')
-                field: id
+                field: player_id
 
       - name: top_element_info
         description: "jsonb; retained for audit"
@@ -238,4 +238,117 @@ models:
         tests: []
 
       - name: strength_defence_away
+        tests: []
+
+  - name: stg_players
+    description: "Staged players (elements) from bootstrap_static"
+    columns:
+      - name: player_id
+        description: "natural key for player"
+        tests:
+          - unique
+          - not_null
+
+      - name: player_web_name
+        description: "display name"
+        tests:
+          - not_null
+
+      - name: team_id
+        description: "FK to teams"
+        tests:
+          - not_null
+
+      - name: position_id
+        description: "FK to player positions / element_type"
+        tests:
+          - not_null
+
+      - name: now_cost
+        description: "current cost (stored as now_cost/10)"
+        tests:
+          - not_null
+
+      - name: total_points
+        description: "cumulative points"
+        tests:
+          - not_null
+
+      - name: minutes
+        description: "minutes played"
+        tests: []
+
+      - name: starts
+        tests: []
+
+      - name: goals_scored
+        tests: []
+
+      - name: assists
+        tests: []
+
+      - name: clean_sheets
+        tests: []
+
+      - name: bps
+        tests: []
+
+      - name: bonus
+        tests: []
+
+      - name: selected_by_percent
+        tests: []
+
+      - name: transfers_in
+        tests: []
+
+      - name: transfers_out
+        tests: []
+
+      - name: now_cost_rank
+        tests: []
+
+      - name: news_added
+        tests: []
+
+      - name: in_dreamteam
+        tests: []
+
+      - name: selected_rank
+        tests: []
+
+      - name: selected_rank_type
+        tests: []
+
+      - name: ep_next
+        tests: []
+
+      - name: ep_this
+        tests: []
+
+      - name: influence
+        tests: []
+
+      - name: ict_index
+        tests: []
+
+      - name: expected_goals
+        tests: []
+
+      - name: expected_assists
+        tests: []
+
+      - name: expected_goals_conceded
+        tests: []
+
+      - name: starts_per_90
+        tests: []
+
+      - name: saves
+        tests: []
+
+      - name: saves_per_90
+        tests: []
+
+      - name: news
         tests: []
