@@ -1,53 +1,48 @@
 import logging
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from config.settings import DB_CONFIG
+import pandas as pd
+from config.db_config import get_schema
 
 def upsert_dataframe(
     df,
     table_name: str,
     engine: Engine,
-    unique_key: str,
-    staging_schema: str = None,
-    target_schema: str = None,
+    unique_key: str = None,
+    staging_schema: str = None,   # e.g., raw_staging_tmp
+    target_schema: str = None,    # e.g., raw
     batch_size: int = 5000
 ):
     """
-    Production-ready upsert of a pandas DataFrame into a Postgres table via staging.
-
-    Parameters:
-    - df: pandas DataFrame
-    - table_name: base table name (no schema), e.g. 'fixtures'
-    - engine: SQLAlchemy Engine
-    - unique_key: primary key column for ON CONFLICT
-    - staging_schema: staging schema (from env/config if not provided)
-    - target_schema: target schema (from env/config if not provided)
-    - batch_size: number of rows per batch insert
+    Generic upsert function: loads a pandas DataFrame into a staging schema and merges into target schema.
     """
-    # Use schemas from config if not provided
-    if staging_schema is None:
-        staging_schema = DB_CONFIG.get("raw_staging_schema", "raw_staging")
-    if target_schema is None:
-        target_schema = DB_CONFIG.get("raw_schema", "raw")
 
+    # Use defaults from config
+    if staging_schema is None:
+        staging_schema = get_schema("staging_tmp")
+    if target_schema is None:
+        target_schema = get_schema("target")
+
+    # Convert dict to DataFrame
     if isinstance(df, dict):
-        import pandas as pd
         df = pd.DataFrame([df])
 
-    if df.empty:
+    if df is None or getattr(df, "empty", False):
         logging.info(f"No data to upsert into {target_schema}.{table_name}.")
         return
 
     cols = list(df.columns)
-    cols_str = ", ".join(cols)
+    # quote column names to avoid SQL issues with casing or reserved words
+    cols_str = ", ".join([f'"{c}"' for c in cols])
     placeholders = ", ".join([f":{c}" for c in cols])
 
+    # Fully qualified table names
     staging_table = f"{staging_schema}.{table_name}"
     target_table = f"{target_schema}.{table_name}"
 
     try:
         with engine.begin() as conn:
-            # clear staging and bulk insert into staging table
+            # Load into staging table
             conn.execute(text(f"TRUNCATE TABLE {staging_table};"))
 
             insert_sql = text(f"INSERT INTO {staging_table} ({cols_str}) VALUES ({placeholders})")
@@ -55,19 +50,21 @@ def upsert_dataframe(
             for i in range(0, len(rows), batch_size):
                 conn.execute(insert_sql, rows[i : i + batch_size])
 
-            # merge from staging -> target
+            # Merge into target table
             if unique_key:
                 update_cols = [c for c in cols if c != unique_key]
-                set_clause = ", ".join([f"{c} = EXCLUDED.{c}" for c in update_cols]) if update_cols else ""
+                if update_cols:
+                    set_clause = ", ".join([f'"{c}" = EXCLUDED."{c}"' for c in update_cols])
+                else:
+                    set_clause = ""
                 merge_sql = f"""
                     INSERT INTO {target_table} ({cols_str})
                     SELECT {cols_str} FROM {staging_table}
-                    ON CONFLICT ({unique_key}) DO UPDATE SET {set_clause};
+                    ON CONFLICT ("{unique_key}") DO UPDATE SET {set_clause};
                 """
                 conn.execute(text(merge_sql))
                 logging.info("Upserted %d rows into %s", len(rows), target_table)
             else:
-                # insert-only append
                 insert_from_staging = f"""
                     INSERT INTO {target_table} ({cols_str})
                     SELECT {cols_str} FROM {staging_table};

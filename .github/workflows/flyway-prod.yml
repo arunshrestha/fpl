@@ -1,0 +1,26 @@
+name: Flyway — Production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DB_HOST: ${{ secrets.PROD_DB_HOST }}
+      DB_PORT: ${{ secrets.PROD_DB_PORT }}
+      DB_USER: ${{ secrets.PROD_DB_USER }}
+      DB_PASS: ${{ secrets.PROD_DB_PASS }}
+      DB_NAME: ${{ secrets.PROD_DB_NAME }}
+      DB_SCHEMA: ${{ secrets.PROD_DB_SCHEMA }}    # optional
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Flyway migrate (prod)
+        uses: flyway/flyway-action@v2
+        with:
+          configFiles: ./db/flyway/conf/flyway_prod.conf
+          command: migrate

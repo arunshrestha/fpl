@@ -1,0 +1,30 @@
+name: Flyway — Staging
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - staging
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      DB_HOST: ${{ secrets.STAGING_DB_HOST }}
+      DB_PORT: ${{ secrets.STAGING_DB_PORT }}
+      DB_USER: ${{ secrets.STAGING_DB_USER }}
+      DB_PASS: ${{ secrets.STAGING_DB_PASS }}
+      DB_NAME: ${{ secrets.STAGING_DB_NAME }}
+      DB_SCHEMA: ${{ secrets.STAGING_DB_SCHEMA }}   # optional
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Flyway migrate (staging)
+        uses: flyway/flyway-action@v2
+        with:
+          # point to the staging-specific flyway config you will create
+          configFiles: ./db/flyway/conf/flyway_staging.conf
+          command: migrate
