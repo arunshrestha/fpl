@@ -22,9 +22,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run Flyway migrate (staging)
-        uses: flyway/flyway-action@v2
+      - name: Ensure Java (required for Flyway)
+        uses: actions/setup-java@v4
         with:
-          # point to the staging-specific flyway config you will create
-          configFiles: ./db/flyway/conf/flyway_staging.conf
-          command: migrate
+          distribution: temurin
+          java-version: '17'
+
+      - name: Download Flyway CLI
+        run: |
+          FLYWAY_VERSION=11.15.0
+          curl -L "https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz" -o flyway.tar.gz
+          tar -xzf flyway.tar.gz
+          ls -la
+
+      - name: Run Flyway migrate (staging)
+        run: |
+          FLYWAY_DIR=$(ls -d flyway-* | head -n1)
+          echo "Using Flyway from $FLYWAY_DIR"
+          ./$FLYWAY_DIR/flyway -configFiles=./db/flyway/conf/flyway_staging.conf migrate
