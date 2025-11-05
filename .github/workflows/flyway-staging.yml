@@ -16,37 +16,22 @@ jobs:
       DB_USER: ${{ secrets.STAGING_DB_USER }}
       DB_PASS: ${{ secrets.STAGING_DB_PASS }}
       DB_NAME: ${{ secrets.STAGING_DB_NAME }}
-      DB_SCHEMA: ${{ secrets.STAGING_DB_SCHEMA }}
+      DB_SCHEMA: ${{ secrets.STAGING_DB_SCHEMA }}   # optional
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ensure Java (required for Flyway)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Download Flyway CLI (Linux)
+      - name: Run Flyway migrate (staging) using Docker
         run: |
-          FLYWAY_VERSION=11.15.0
-          echo "Downloading Flyway v$FLYWAY_VERSION..."
-          curl -L "https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz" -o flyway.tar.gz
-          
-          echo "Extracting Flyway..."
-          mkdir flyway
-          tar -xzf flyway.tar.gz -C flyway --strip-components=1
-          
-          echo "Flyway installed at:"
-          ls -la flyway
-
-      - name: Run Flyway migrate (staging)
-        run: |
-          ./flyway/flyway \
-            -url="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}" \
-            -user="${DB_USER}" \
-            -password="${DB_PASS}" \
-            -schemas="${DB_SCHEMA}" \
-            -locations="filesystem:./db/flyway/sql" \
-            migrate
+          docker run --rm \
+            -v "${{ github.workspace }}:/flyway" \
+            -w /flyway \
+            -e DB_HOST="$DB_HOST" \
+            -e DB_PORT="$DB_PORT" \
+            -e DB_USER="$DB_USER" \
+            -e DB_PASS="$DB_PASS" \
+            -e DB_NAME="$DB_NAME" \
+            -e DB_SCHEMA="$DB_SCHEMA" \
+            flyway/flyway:11.15.0 \
+            -configFiles=./db/flyway/conf/flyway_staging.conf migrate
