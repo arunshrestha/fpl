@@ -27,7 +27,7 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}/db/flyway/sql:/flyway/sql \
             flyway/flyway:11.15.0 \
-            -url="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}" \
+            -url="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require" \
             -user="${DB_USER}" \
             -password="${DB_PASS}" \
             -configFiles=./db/flyway/conf/flyway_staging.conf \
