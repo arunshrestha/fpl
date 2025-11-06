@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     env:
-      # Secrets (create these in GitHub) mapped into job env
       DB_HOST: ${{ secrets.STAGING_DB_HOST }}
       DB_PORT: ${{ secrets.STAGING_DB_PORT }}
       DB_USER: ${{ secrets.STAGING_DB_USER }}
@@ -23,7 +22,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Flyway migrate (staging) using Docker
+      - name: Run Flyway migrate (staging) using Docker (sslmode=require)
         run: |
           docker run --rm \
             -v "${{ github.workspace }}:/workspace" \
@@ -35,4 +34,8 @@ jobs:
             -e DB_NAME="$DB_NAME" \
             -e DB_SCHEMA="$DB_SCHEMA" \
             flyway/flyway:11.15.0 \
-            -configFiles=./db/flyway/conf/flyway_staging.conf migrate
+            -configFiles=./db/flyway/conf/flyway_staging.conf \
+            -url="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require" \
+            -user="${DB_USER}" \
+            -password="${DB_PASS}" \
+            migrate
