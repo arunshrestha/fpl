@@ -1,4 +1,4 @@
-name: Flyway — Staging
+name: Flyway — Production
 
 on:
   workflow_dispatch:
