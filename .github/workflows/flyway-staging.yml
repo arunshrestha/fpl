@@ -36,5 +36,4 @@ jobs:
           edition: 'community'
 
       - name: Run Flyway migrations
-        env:
         run: flyway -configFiles=flyway_staging.conf migrate
