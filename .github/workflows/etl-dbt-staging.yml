@@ -48,7 +48,7 @@ jobs:
         #if: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.run_etl == 'true') || github.event_name == 'schedule' }}
         env:
           ENV: staging
-        run: python scripts/run_pipeline.py
+        run: python -m scripts.run_pipeline
 
       - name: Run dbt (staging)
         #if: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.run_dbt == 'true') || github.event_name == 'schedule' }}
