@@ -22,20 +22,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Flyway migrate (staging) using Docker (sslmode=require)
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspace" \
-            -w /workspace \
-            -e DB_HOST="$DB_HOST" \
-            -e DB_PORT="$DB_PORT" \
-            -e DB_USER="$DB_USER" \
-            -e DB_PASS="$DB_PASS" \
-            -e DB_NAME="$DB_NAME" \
-            -e DB_SCHEMA="$DB_SCHEMA" \
-            flyway/flyway:11.15.0 \
-            -configFiles=./db/flyway/conf/flyway_staging.conf \
-            -url="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require" \
-            -user="${DB_USER}" \
-            -password="${DB_PASS}" \
-            migrate
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flyway CLI
+        uses: red-gate/setup-flyway@v1
+        with:
+          version: '11.15.0'
+          architecture: 'java'
+          edition: 'community'
+
+      - name: Run Flyway migrations
+        env:
+        run: flyway -configFiles=flyway_staging.conf migrate
