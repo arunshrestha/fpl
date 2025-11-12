@@ -1,36 +1,33 @@
-from sqlalchemy import create_engine, text
 import os
 import sys
-from pathlib import Path
-from dotenv import load_dotenv
+import argparse
+from sqlalchemy import text
 
-# Determine environment (default: dev)
-env = "dev"
-if len(sys.argv) > 1 and sys.argv[1] in ("dev", "prod"):
-    env = sys.argv[1]
+def main():
+    parser = argparse.ArgumentParser(description="Quick DB connection test.")
+    parser.add_argument("--env", help="Environment to use (local|staging|prod). If omitted reads ENV env var.", default=None)
+    args = parser.parse_args()
 
-# Load environment variables from .env.{env}
-project_root = Path(__file__).resolve().parent.parent
-env_file = project_root / f".env.{env}"
-if not env_file.exists():
-    raise FileNotFoundError(f"Environment file {env_file} not found.")
-load_dotenv(env_file)
+    # Determine environment and ensure it's available to config modules
+    env = args.env or os.getenv("ENV", "local")
+    os.environ["ENV"] = env
 
-DB_USER = os.getenv("POSTGRES_USER")
-DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-DB_HOST = os.getenv("POSTGRES_HOST")
-DB_PORT = int(os.getenv("POSTGRES_PORT", 5432))
-DB_NAME = os.getenv("POSTGRES_DB")
+    # import after ENV is set so config modules read the correct environment
+    from db.postgres_client import get_engine
 
-# Create SQLAlchemy engine
-engine = create_engine(
-    f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-)
+    try:
+        engine = get_engine()
+    except Exception as exc:
+        print(f"[ERROR] Failed to create DB engine for env='{env}': {exc}", file=sys.stderr)
+        sys.exit(2)
 
-# Test connection
-try:
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT NOW();"))
-        print(f"✅ Connection successful to {env}! Current database timestamp:", result.fetchone()[0])
-except Exception as e:
-    print(f"❌ Connection failed to {env}:", e)
+    try:
+        with engine.connect() as conn:
+            r = conn.execute(text("SELECT now()"))
+            print(f"ENV={env} DB now(): {r.scalar()}")
+    except Exception as exc:
+        print(f"[ERROR] Query failed for env='{env}': {exc}", file=sys.stderr)
+        sys.exit(3)
+
+if __name__ == "__main__":
+    main()

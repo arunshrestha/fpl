@@ -34,14 +34,13 @@ def build_dbt_cmd(command: str, args) -> list:
         if extra and extra[0] == "--":
             extra = extra[1:]
 
-        # remove script/internal flags (and their values) that should not be forwarded to dbt
         internal_flags_with_value = {"--env", "-e"}
         cleaned = []
         i = 0
         while i < len(extra):
             tok = extra[i]
             if tok in internal_flags_with_value:
-                # skip this flag and the next token if it's a value (not another flag)
+                # skip this flag and the next token if it's a value
                 if i + 1 < len(extra) and not extra[i + 1].startswith("-"):
                     i += 2
                 else:
@@ -58,18 +57,20 @@ def run_dbt(command: str, env: str, dbt_cmd: list | None = None):
     project_root = Path(os.getenv("FPL_PROJECT_ROOT", Path(__file__).resolve().parent.parent))
 
     env_path = project_root / f".env.{env}"
-    if not env_path.exists():
-        raise FileNotFoundError(f".env.{env} file not found at {env_path}")
-    load_dotenv(env_path)
+    # load .env.<env> if present; allow missing file (so env vars can be provided another way)
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        print(f"[run_dbt] warning: .env.{env} not found at {env_path}, continuing using environment variables")
 
     dbt_dir = project_root / "dbt"
     dbt_env = os.environ.copy()
+    # tell dbt to use the profiles.yml in the project dir (we keep profiles.yml in dbt/)
     dbt_env["DBT_PROFILES_DIR"] = str(dbt_dir)
 
     if dbt_cmd is None:
         dbt_cmd = ["dbt", command]
 
-    # don't forward script-level env flag in the printed command
     printable = " ".join(shlex.quote(p) for p in dbt_cmd)
     print("Running:", printable)
     result = subprocess.run(
@@ -88,7 +89,7 @@ def run_dbt(command: str, env: str, dbt_cmd: list | None = None):
 def main(argv):
     parser = argparse.ArgumentParser(description="Run dbt with project-local profiles and .env.<env>.")
     parser.add_argument("command", nargs="?", default="run", help="dbt command (run|test|compile|seed|snapshot|docs|ls)")
-    parser.add_argument("--env", "-e", default="dev", help=".env file suffix (default: dev)")
+    parser.add_argument("--env", "-e", default="local", help=".env file suffix (default: local)")
     parser.add_argument("--select", "-s", help="dbt --select selector (e.g. stg_gameweeks+)")
     parser.add_argument("--models", "-m", help="alias for --select")
     parser.add_argument("--threads", "-t", type=int, help="dbt --threads value")
