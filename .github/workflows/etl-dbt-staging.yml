@@ -2,7 +2,7 @@ name: ETL + dbt — Staging
 
 on:
   schedule:
-    - cron: '20 23 * * *'
+    - cron: "41 4 * * *"
   push:
     branches:
       - staging
