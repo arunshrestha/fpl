@@ -1,4 +1,4 @@
-name: ETL + dbt — Staging
+name: ETL + dbt
 
 on:
   schedule:
@@ -47,7 +47,7 @@ jobs:
       # ----------------------------
       - name: Parse DATABASE_URL into DB_* env vars
         run: |
-          python - <<EOF
+          python - <<'EOF' >> "$GITHUB_ENV"
           import os
           from urllib.parse import urlparse
 
@@ -58,7 +58,8 @@ jobs:
           print(f"DB_USER={url.username}")
           print(f"DB_PASS={url.password}")
           print(f"DB_NAME={url.path.lstrip('/')}")
-          EOF >> $GITHUB_ENV
+          EOF
+
 
       # ----------------------------
       # Canonical schema env vars
