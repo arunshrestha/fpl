@@ -1,0 +1,42 @@
+name: Flyway Migrations
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - staging
+      - main # main for prod
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+    env:
+      # Set APP_ENV based on branch
+      APP_ENV: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+      
+      # Set Flyway JDBC URL dynamically based on APP_ENV
+      FLYWAY_JDBC_URL: ${{ github.ref_name == 'main' && secrets.JDBC_URL_PROD || secrets.JDBC_URL_STAGING }}
+
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flyway CLI
+        uses: red-gate/setup-flyway@v1
+        with:
+          version: '11.15.0'
+          architecture: 'java'
+          edition: 'community'
+
+      - name: Run Flyway migrations
+        run: |
+          echo "Running Flyway migrations for $APP_ENV"
+          flyway -configFiles=db/flyway/conf/flyway.conf -url="$FLYWAY_JDBC_URL" migrate

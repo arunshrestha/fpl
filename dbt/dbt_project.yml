@@ -17,10 +17,10 @@ models:
   fpl:
 
     staging:
-      +schema: "{{ env_var('STAGING_SCHEMA', 'staging') }}"
+      +schema: "staging"
 
     intermediate:
-      +schema: "{{ env_var('INTERMEDIATE_SCHEMA', 'intermediate') }}"
+      +schema: "intermediate"
 
     marts:
-      +schema: "{{ env_var('MART_SCHEMA', 'mart') }}"
+      +schema: "mart"
