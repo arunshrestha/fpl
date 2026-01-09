@@ -13,10 +13,6 @@ on:
         description: 'Run dbt (run models)'
         required: false
         default: 'true'
-      debug:
-        description: 'Enable debug mode (verbose output)'
-        required: false
-        default: 'false'
   push:
     branches:
       - staging
@@ -25,12 +21,12 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
     env:
-      ENV: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
       APP_ENV: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+
+      # Canonical database URL
       DATABASE_URL: ${{ github.ref_name == 'main' && secrets.DATABASE_URL_PROD || secrets.DATABASE_URL_STAGING }}
-      DEBUG: ${{ github.event.inputs.debug == 'true' && '1' || '0' }}
 
     steps:
       - name: Checkout
@@ -46,234 +42,76 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+            # ----------------------------
+      # Parse DATABASE_URL for dbt (session pooler URL)
       # ----------------------------
-      # STEP 1: Validate DATABASE_URL is set
-      # ----------------------------
-      - name: "DEBUG: Validate DATABASE_URL"
+      - name: Parse DATABASE_URL into DB_* env vars
+        shell: bash
         run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "❌ ERROR: DATABASE_URL is empty!"
-            echo "Expected secrets.DATABASE_URL_STAGING or secrets.DATABASE_URL_PROD"
-            exit 1
-          fi
-          echo "✓ DATABASE_URL is set"
-          # Mask the password in logs
-          echo "DATABASE_URL (masked): $(echo $DATABASE_URL | sed 's/:.*@/@/g')"
-
-      # ----------------------------
-      # STEP 2: Parse DATABASE_URL
-      # ----------------------------
-      - name: "Parse DATABASE_URL into DB_* env vars"
-        run: |
-          python3 << 'EOF'
+          python - <<'EOF'
           import os
-          from urllib.parse import urlparse
-          
+
           db_url = os.environ.get("DATABASE_URL")
           if not db_url:
-              print("❌ DATABASE_URL not set")
-              exit(1)
-          
-          print("📋 Parsing DATABASE_URL...")
-          try:
-              url = urlparse(db_url)
-              host = url.hostname or "localhost"
-              port = url.port or 5432
-              user = url.username or "postgres"
-              password = url.password or ""
-              dbname = url.path.lstrip("/") or "postgres"
-              
-              print(f"  host: {host}")
-              print(f"  port: {port}")
-              print(f"  user: {user}")
-              print(f"  dbname: {dbname}")
-              print(f"  password: {'***' if password else '(empty)'}")
-              
-              github_env = os.environ.get("GITHUB_ENV")
-              with open(github_env, "a") as f:
-                  f.write(f"DB_HOST={host}\n")
-                  f.write(f"DB_PORT={port}\n")
-                  f.write(f"DB_USER={user}\n")
-                  f.write(f"DB_PASS={password}\n")
-                  f.write(f"DB_NAME={dbname}\n")
-                  f.write(f"DB_SSLMODE=require\n")
-              
-              print("✓ Parsed successfully")
-          except Exception as e:
-              print(f"❌ Error parsing DATABASE_URL: {e}")
-              exit(1)
+              raise RuntimeError("DATABASE_URL not set")
+
+          # Remove scheme
+          if db_url.startswith("postgresql://"):
+              db_url = db_url[len("postgresql://"):]
+
+          # Split userinfo and host/db
+          userinfo, hostinfo = db_url.rsplit("@", 1)
+          if ":" not in userinfo:
+              raise RuntimeError("DATABASE_URL missing password")
+          user, password = userinfo.split(":", 1)
+
+          # Split host, port, db
+          hostport, dbname = hostinfo.rsplit("/", 1)
+          if ":" in hostport:
+              host, port = hostport.split(":", 1)
+          else:
+              host = hostport
+              port = 5432
+
+          # Write to GitHub environment file (no printing secrets)
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"DB_HOST={host}\n")
+              f.write(f"DB_PORT={port}\n")
+              f.write(f"DB_USER={user}\n")
+              f.write(f"DB_PASS={password}\n")
+              f.write(f"DB_NAME={dbname}\n")
           EOF
 
       # ----------------------------
-      # STEP 3: DNS resolution test
+      # Canonical schema env vars
       # ----------------------------
-      - name: "DEBUG: Test DNS resolution"
+      - name: Set canonical schema env vars
         run: |
-          echo "🔍 Testing DNS resolution for DB_HOST: $DB_HOST"
-          
-          # Try getent (Linux)
-          if command -v getent &> /dev/null; then
-            echo "  Using getent..."
-            if getent hosts "$DB_HOST"; then
-              echo "  ✓ DNS resolution successful"
-            else
-              echo "  ⚠ DNS resolution failed (getent)"
-            fi
-          fi
-          
-          # Try host command
-          if command -v host &> /dev/null; then
-            echo "  Using host command..."
-            if host "$DB_HOST"; then
-              echo "  ✓ DNS resolution successful"
-            else
-              echo "  ⚠ DNS resolution failed (host)"
-            fi
-          fi
-          
-          # Try nslookup
-          if command -v nslookup &> /dev/null; then
-            echo "  Using nslookup..."
-            if nslookup "$DB_HOST"; then
-              echo "  ✓ DNS resolution successful"
-            else
-              echo "  ⚠ DNS resolution failed (nslookup)"
-            fi
-          fi
+          echo "RAW_SCHEMA=raw" >> $GITHUB_ENV
+          echo "STAGING_SCHEMA=staging" >> $GITHUB_ENV
+          echo "INTERMEDIATE_SCHEMA=intermediate" >> $GITHUB_ENV
+          echo "MART_SCHEMA=mart" >> $GITHUB_ENV
 
       # ----------------------------
-      # STEP 4: TCP connectivity test
+      # Run ETL
       # ----------------------------
-      - name: "DEBUG: Test TCP connectivity"
-        run: |
-          python3 << 'EOF'
-          import socket
-          import os
-          
-          host = os.environ.get("DB_HOST")
-          port = int(os.environ.get("DB_PORT", 5432))
-          
-          print(f"🔌 Testing TCP connection to {host}:{port}...")
-          
-          sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-          sock.settimeout(10)
-          
-          try:
-              result = sock.connect_ex((host, port))
-              if result == 0:
-                  print(f"  ✓ TCP connection successful")
-              else:
-                  print(f"  ❌ TCP connection failed (errno {result})")
-                  exit(1)
-          except socket.gaierror as e:
-              print(f"  ❌ Hostname resolution error: {e}")
-              exit(1)
-          except socket.timeout:
-              print(f"  ❌ TCP connection timeout (10s)")
-              exit(1)
-          except Exception as e:
-              print(f"  ❌ TCP connection error: {e}")
-              exit(1)
-          finally:
-              sock.close()
-          EOF
-
-      # ----------------------------
-      # STEP 5: Test PostgreSQL connection (psycopg2)
-      # ----------------------------
-      - name: "DEBUG: Test PostgreSQL connection"
-        run: |
-          python3 << 'EOF'
-          import os
-          
-          try:
-              import psycopg2
-          except ImportError:
-              print("⚠ psycopg2 not installed, skipping PostgreSQL test")
-              exit(0)
-          
-          host = os.environ.get("DB_HOST")
-          port = int(os.environ.get("DB_PORT", 5432))
-          user = os.environ.get("DB_USER")
-          password = os.environ.get("DB_PASS")
-          dbname = os.environ.get("DB_NAME")
-          
-          print(f"🐘 Testing PostgreSQL connection to {user}@{host}:{port}/{dbname}...")
-          
-          try:
-              conn = psycopg2.connect(
-                  host=host,
-                  port=port,
-                  user=user,
-                  password=password,
-                  database=dbname,
-                  sslmode="require",
-                  connect_timeout=10
-              )
-              cursor = conn.cursor()
-              cursor.execute("SELECT version();")
-              version = cursor.fetchone()
-              print(f"  ✓ PostgreSQL connection successful")
-              print(f"  Version: {version[0]}")
-              cursor.close()
-              conn.close()
-          except psycopg2.OperationalError as e:
-              print(f"  ❌ PostgreSQL connection failed: {e}")
-              exit(1)
-          except Exception as e:
-              print(f"  ❌ Error: {e}")
-              exit(1)
-          EOF
-
-      # ----------------------------
-      # STEP 6: dbt debug command
-      # ----------------------------
-      - name: "DEBUG: Run dbt debug"
-        run: |
-          echo "🔧 Running dbt debug for target: $APP_ENV"
-          dbt debug --profiles-dir dbt --project-dir dbt --target $APP_ENV
-
-      # ----------------------------
-      # STEP 7: List dbt profiles
-      # ----------------------------
-      - name: "DEBUG: Show dbt profiles.yml"
-        run: |
-          echo "📄 Current dbt/profiles.yml:"
-          cat dbt/profiles.yml
-          echo ""
-          echo "📄 Environment variables (masked):"
-          env | grep -E '^(ENV|APP_ENV|DB_|DATABASE_)' | sed 's/:.*@/@/g'
-
-      # ----------------------------
-      # STEP 8: Set canonical schema env vars
-      # ----------------------------
-      - name: "Set canonical schema env vars"
-        run: |
-          echo "DB_SCHEMA=raw" >> $GITHUB_ENV
-          echo "DB_SCHEMA_INTERMEDIATE=intermediate" >> $GITHUB_ENV
-          echo "DB_SCHEMA_MART=mart" >> $GITHUB_ENV
-          echo "✓ Schema env vars set"
-
-      # ----------------------------
-      # STEP 9: Run ETL
-      # ----------------------------
-      - name: "Run ETL"
+      - name: Run ETL
         if: >
           (github.event_name == 'workflow_dispatch' && github.event.inputs.run_etl == 'true') ||
           github.event_name == 'schedule' ||
           github.event_name == 'push'
         run: |
-          echo "🚀 Running ETL for $APP_ENV"
+          echo "Running ETL for $APP_ENV"
           python -m scripts.run_pipeline
 
       # ----------------------------
-      # STEP 10: Run dbt
+      # Run dbt
       # ----------------------------
-      - name: "Run dbt"
+      - name: Run dbt
         if: >
           (github.event_name == 'workflow_dispatch' && github.event.inputs.run_dbt == 'true') ||
           github.event_name == 'schedule' ||
           github.event_name == 'push'
         run: |
-          echo "🚀 Running dbt for $APP_ENV"
+          echo "Running dbt for $APP_ENV"
           dbt run --profiles-dir dbt --project-dir dbt --target $APP_ENV

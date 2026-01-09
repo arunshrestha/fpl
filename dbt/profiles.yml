@@ -19,7 +19,7 @@ fpl:
       user: "{{ env_var('DB_USER') }}"
       password: "{{ env_var('DB_PASS') }}"
       dbname: "{{ env_var('DB_NAME') }}"
-      schema: "{{ env_var('DB_SCHEMA', 'raw') }}"
+      schema: "{{ env_var('STAGING_SCHEMA', 'staging') }}"
       threads: 4
       sslmode: require
 
@@ -30,6 +30,6 @@ fpl:
       user: "{{ env_var('DB_USER') }}"
       password: "{{ env_var('DB_PASS') }}"
       dbname: "{{ env_var('DB_NAME') }}"
-      schema: "{{ env_var('DB_SCHEMA', 'raw') }}"
+      schema: "{{ env_var('STAGING_SCHEMA', 'staging') }}"
       threads: 8
       sslmode: require
