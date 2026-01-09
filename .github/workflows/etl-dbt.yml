@@ -43,18 +43,18 @@ jobs:
           pip install -r requirements.txt
 
       # ----------------------------
-      # Parse DATABASE_URL for dbt
+      # Parse DATABASE_URL for dbt (session pooler URL)
       # ----------------------------
       - name: Parse DATABASE_URL into DB_* env vars
         shell: bash
         run: |
-          python - <<EOF
+          python - <<'EOF'
           import os
           from urllib.parse import urlparse
 
           url = urlparse(os.environ["DATABASE_URL"])
 
-          # Write directly to $GITHUB_ENV
+          # Write to GitHub environment file without printing
           with open(os.environ['GITHUB_ENV'], 'a') as f:
               f.write(f"DB_HOST={url.hostname}\n")
               f.write(f"DB_PORT={url.port or 5432}\n")
