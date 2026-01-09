@@ -1,67 +1,47 @@
-import os
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from config.db_config import get_db_url
 
-# cache engines per environment key
-_engines: Dict[str, Engine] = {}
+from config.db_config import get_database_url
 
-
-def _env_key(env: Optional[str]) -> str:
-    """Normalized cache key for environment (lowercase)."""
-    return (env or os.getenv("ENV", "local")).lower()
+_engine: Engine | None = None
 
 
-def get_engine(env: Optional[str] = None, engine_kwargs: Optional[Dict[str, Any]] = None) -> Engine:
+def get_engine(engine_kwargs: Dict[str, Any] | None = None) -> Engine:
     """
-    Return a SQLAlchemy Engine for the requested environment.
+    Return a singleton SQLAlchemy Engine.
 
-    - env: "local"/"dev"/"staging"/"prod" or None (uses ENV environment variable, default "local")
-    - engine_kwargs: optional dict forwarded to sqlalchemy.create_engine (e.g., {"connect_args": {"sslmode":"require"}})
-
-    Caches one Engine instance per env key.
-    Raises RuntimeError when no DB URL can be resolved for the environment.
+    Uses DATABASE_URL from the environment.
     """
-    key = _env_key(env)
-    if key in _engines:
-        return _engines[key]
+    global _engine
 
-    url = get_db_url(env)
-    if not url:
-        raise RuntimeError(
-            f"No database URL found for environment '{key}'.\n"
-            f"Set DATABASE_URL_{key.upper()} or POSTGRES_USER_{key.upper()}/POSTGRES_PASSWORD_{key.upper()}/"
-            "POSTGRES_HOST_{key.upper()}/POSTGRES_DB_{key.upper()} (or DB_URL_{env}) as appropriate."
-        )
+    if _engine is not None:
+        return _engine
 
-    kwargs = dict(engine_kwargs or {})
-    # default to SQLAlchemy future mode
+    url = get_database_url()
+
+    kwargs = engine_kwargs or {}
+    kwargs.setdefault("pool_pre_ping", True)
     kwargs.setdefault("future", True)
 
-    engine = create_engine(url, **kwargs)
-    _engines[key] = engine
-    return engine
+    _engine = create_engine(url, **kwargs)
+    return _engine
 
 
-def get_connection(env: Optional[str] = None):
+def get_connection():
     """
-    Return a Connection context manager for the requested environment.
+    Context-managed database connection.
 
     Usage:
-        with get_connection('staging') as conn:
-            conn.execute(text("SELECT 1"))
+        with get_connection() as conn:
+            conn.execute(...)
     """
-    engine = get_engine(env)
-    return engine.connect()
+    return get_engine().begin()
 
 
-def dispose_engines() -> None:
-    """Dispose and clear all cached engines (useful in tests/cleanup)."""
-    global _engines
-    for e in _engines.values():
-        try:
-            e.dispose()
-        except Exception:
-            pass
-    _engines = {}
+def dispose_engine() -> None:
+    """Dispose the engine (useful for tests)."""
+    global _engine
+    if _engine is not None:
+        _engine.dispose()
+        _engine = None

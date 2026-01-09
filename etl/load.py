@@ -1,77 +1,81 @@
 import logging
+from typing import Optional
+
+import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-import pandas as pd
-from config.db_config import get_schema
+
+from config import schemas
+
+logger = logging.getLogger(__name__)
+
 
 def upsert_dataframe(
-    df,
+    df: pd.DataFrame,
     table_name: str,
     engine: Engine,
-    unique_key: str = None,
-    staging_schema: str = None,   # e.g., raw_staging_tmp
-    target_schema: str = None,    # e.g., raw
-    batch_size: int = 5000
-):
+    *,
+    unique_key: Optional[str] = None,
+    staging_schema: str = schemas.RAW_STAGING_TMP,
+    target_schema: str = schemas.RAW,
+    batch_size: int = 5_000,
+) -> None:
     """
-    Generic upsert function: loads a pandas DataFrame into a staging schema and merges into target schema.
+    Load a DataFrame into a staging table, then merge into the target table.
+
+    - Uses TRUNCATE + INSERT for staging
+    - Uses INSERT ... ON CONFLICT for upsert
     """
 
-    # Use defaults from config
-    if staging_schema is None:
-        staging_schema = get_schema("staging_tmp")
-    if target_schema is None:
-        target_schema = get_schema("target")
+    if df is None or df.empty:
+        logger.info("No data to load into %s.%s", target_schema, table_name)
+        return
 
-    # Convert dict to DataFrame
+    # Ensure DataFrame
     if isinstance(df, dict):
         df = pd.DataFrame([df])
 
-    if df is None or getattr(df, "empty", False):
-        logging.info(f"No data to upsert into {target_schema}.{table_name}.")
-        return
+    columns = list(df.columns)
+    quoted_cols = ", ".join(f'"{c}"' for c in columns)
+    placeholders = ", ".join(f":{c}" for c in columns)
 
-    cols = list(df.columns)
-    # quote column names to avoid SQL issues with casing or reserved words
-    cols_str = ", ".join([f'"{c}"' for c in cols])
-    placeholders = ", ".join([f":{c}" for c in cols])
-
-    # Fully qualified table names
     staging_table = f"{staging_schema}.{table_name}"
     target_table = f"{target_schema}.{table_name}"
 
-    try:
-        with engine.begin() as conn:
-            # Load into staging table
-            conn.execute(text(f"TRUNCATE TABLE {staging_table};"))
+    rows = df.to_dict(orient="records")
 
-            insert_sql = text(f"INSERT INTO {staging_table} ({cols_str}) VALUES ({placeholders})")
-            rows = df.to_dict(orient="records")
-            for i in range(0, len(rows), batch_size):
-                conn.execute(insert_sql, rows[i : i + batch_size])
+    with engine.begin() as conn:
+        # 1️⃣ Clear staging
+        conn.execute(text(f"TRUNCATE TABLE {staging_table};"))
 
-            # Merge into target table
-            if unique_key:
-                update_cols = [c for c in cols if c != unique_key]
-                if update_cols:
-                    set_clause = ", ".join([f'"{c}" = EXCLUDED."{c}"' for c in update_cols])
-                else:
-                    set_clause = ""
-                merge_sql = f"""
-                    INSERT INTO {target_table} ({cols_str})
-                    SELECT {cols_str} FROM {staging_table}
-                    ON CONFLICT ("{unique_key}") DO UPDATE SET {set_clause};
-                """
-                conn.execute(text(merge_sql))
-                logging.info("Upserted %d rows into %s", len(rows), target_table)
-            else:
-                insert_from_staging = f"""
-                    INSERT INTO {target_table} ({cols_str})
-                    SELECT {cols_str} FROM {staging_table};
-                """
-                conn.execute(text(insert_from_staging))
-                logging.info("Inserted %d rows into %s (append)", len(rows), target_table)
+        # 2️⃣ Load staging
+        insert_sql = text(
+            f"INSERT INTO {staging_table} ({quoted_cols}) VALUES ({placeholders})"
+        )
 
-    except Exception as e:
-        logging.error("Upsert/insert failed for %s.%s: %s", target_schema, table_name, e)
-        raise
+        for i in range(0, len(rows), batch_size):
+            conn.execute(insert_sql, rows[i : i + batch_size])
+
+        # 3️⃣ Merge into target
+        if unique_key:
+            update_cols = [c for c in columns if c != unique_key]
+
+            set_clause = ", ".join(
+                f'"{c}" = EXCLUDED."{c}"' for c in update_cols
+            )
+
+            merge_sql = f"""
+                INSERT INTO {target_table} ({quoted_cols})
+                SELECT {quoted_cols} FROM {staging_table}
+                ON CONFLICT ("{unique_key}")
+                DO UPDATE SET {set_clause};
+            """
+            conn.execute(text(merge_sql))
+            logger.info("Upserted %d rows into %s", len(rows), target_table)
+        else:
+            insert_sql = f"""
+                INSERT INTO {target_table} ({quoted_cols})
+                SELECT {quoted_cols} FROM {staging_table};
+            """
+            conn.execute(text(insert_sql))
+            logger.info("Inserted %d rows into %s", len(rows), target_table)

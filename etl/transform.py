@@ -12,7 +12,7 @@ def ensure_columns(df: pd.DataFrame, expected_cols: List[str]) -> pd.DataFrame:
 
 def transform_bootstrap_static(payload: Dict) -> pd.DataFrame:
     """Return single-row DataFrame with raw payload under 'data'."""
-    return pd.DataFrame([{"data": payload}])
+    return pd.DataFrame([{"id": 1, "data": payload}])
 
 def transform_teams(teams_data: List[Dict]) -> pd.DataFrame:
     """Minimal transformation: standardize teams columns."""
