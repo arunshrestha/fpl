@@ -1,36 +1,35 @@
 fpl:
   target: "{{ env_var('APP_ENV', 'local') }}"
   outputs:
-
     local:
       type: postgres
-      host: "{{ env_var('DB_HOST') }}"
-      port: "{{ env_var('DB_PORT', 5432) | int }}"
-      user: "{{ env_var('DB_USER') }}"
-      password: "{{ env_var('DB_PASS') }}"
-      database: "{{ env_var('DB_NAME') }}"
-      schema: staging
+      host: "{{ env_var('DB_HOST', 'localhost') }}"
+      port: "{{ env_var('DB_PORT', '5432') | int }}"
+      user: "{{ env_var('DB_USER', 'postgres') }}"
+      password: "{{ env_var('DB_PASS', 'postgres') }}"
+      dbname: "{{ env_var('DB_NAME', 'fpl_local') }}"
+      schema: "{{ env_var('DB_SCHEMA', 'public') }}"
       threads: 4
-      sslmode: require
+      sslmode: prefer
 
     staging:
       type: postgres
       host: "{{ env_var('DB_HOST') }}"
-      port: "{{ env_var('DB_PORT', 5432) | int }}"
+      port: "{{ env_var('DB_PORT', '5432') | int }}"
       user: "{{ env_var('DB_USER') }}"
       password: "{{ env_var('DB_PASS') }}"
-      database: "{{ env_var('DB_NAME') }}"
-      schema: staging
+      dbname: "{{ env_var('DB_NAME') }}"
+      schema: "{{ env_var('DB_SCHEMA', 'raw') }}"
       threads: 4
       sslmode: require
 
     prod:
       type: postgres
       host: "{{ env_var('DB_HOST') }}"
-      port: "{{ env_var('DB_PORT', 5432) | int }}"
+      port: "{{ env_var('DB_PORT', '5432') | int }}"
       user: "{{ env_var('DB_USER') }}"
       password: "{{ env_var('DB_PASS') }}"
-      database: "{{ env_var('DB_NAME') }}"
-      schema: staging
+      dbname: "{{ env_var('DB_NAME') }}"
+      schema: "{{ env_var('DB_SCHEMA', 'raw') }}"
       threads: 8
       sslmode: require
