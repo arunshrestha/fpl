@@ -11,6 +11,7 @@ fpl:
       database: "{{ env_var('DB_NAME') }}"
       schema: staging
       threads: 4
+      sslmode: require
 
     staging:
       type: postgres
@@ -21,6 +22,7 @@ fpl:
       database: "{{ env_var('DB_NAME') }}"
       schema: staging
       threads: 4
+      sslmode: require
 
     prod:
       type: postgres
@@ -31,3 +33,4 @@ fpl:
       database: "{{ env_var('DB_NAME') }}"
       schema: staging
       threads: 8
+      sslmode: require
