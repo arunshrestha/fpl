@@ -54,8 +54,9 @@ jobs:
 
           url = urlparse(os.environ["DATABASE_URL"])
 
-          # Write to GitHub environment file without printing
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
+          # The user is url.username, host is url.hostname, db is path.lstrip('/')
+          github_env = os.environ['GITHUB_ENV']
+          with open(github_env, 'a') as f:
               f.write(f"DB_HOST={url.hostname}\n")
               f.write(f"DB_PORT={url.port or 5432}\n")
               f.write(f"DB_USER={url.username}\n")
