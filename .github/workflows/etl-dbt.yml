@@ -2,7 +2,7 @@ name: ETL + dbt
 
 on:
   schedule:
-    - cron: "41 4 * * *"
+    - cron: "6 * * * *"  # ✅ Run at :06 past every hour (00:06, 01:06, 02:06, etc.)
   workflow_dispatch:
     inputs:
       run_etl:
