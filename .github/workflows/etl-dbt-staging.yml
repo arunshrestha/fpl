@@ -1,0 +1,118 @@
+name: ETL + dbt (Staging)
+
+on:
+  schedule:
+    - cron: "7 * * * *"  # ✅ Run at :07 past every hour (00:07, 01:07, 02:07, etc.)
+  workflow_dispatch:
+    inputs:
+      run_etl:
+        description: 'Run Python ETL (scripts/run_pipeline.py)'
+        required: false
+        default: 'true'
+      run_dbt:
+        description: 'Run dbt (run models)'
+        required: false
+        default: 'true'
+  push:
+    branches:
+      - staging
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      APP_ENV: staging
+
+      # Canonical database URL
+      DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+            # ----------------------------
+      # Parse DATABASE_URL for dbt (session pooler URL)
+      # ----------------------------
+      - name: Parse DATABASE_URL into DB_* env vars
+        shell: bash
+        run: |
+          python - <<'EOF'
+          import os
+
+          db_url = os.environ.get("DATABASE_URL")
+          if not db_url:
+              raise RuntimeError("DATABASE_URL not set")
+
+          # Remove scheme
+          if db_url.startswith("postgresql://"):
+              db_url = db_url[len("postgresql://"):]
+
+          # Split userinfo and host/db
+          userinfo, hostinfo = db_url.rsplit("@", 1)
+          if ":" not in userinfo:
+              raise RuntimeError("DATABASE_URL missing password")
+          user, password = userinfo.split(":", 1)
+
+          # Split host, port, db
+          hostport, dbname = hostinfo.rsplit("/", 1)
+          if ":" in hostport:
+              host, port = hostport.split(":", 1)
+          else:
+              host = hostport
+              port = 5432
+
+          # Write to GitHub environment file (no printing secrets)
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"DB_HOST={host}\n")
+              f.write(f"DB_PORT={port}\n")
+              f.write(f"DB_USER={user}\n")
+              f.write(f"DB_PASS={password}\n")
+              f.write(f"DB_NAME={dbname}\n")
+          EOF
+
+      # ----------------------------
+      # Canonical schema env vars
+      # ----------------------------
+      - name: Set canonical schema env vars
+        run: |
+          echo "RAW_SCHEMA=raw" >> $GITHUB_ENV
+          echo "STAGING_SCHEMA=staging" >> $GITHUB_ENV
+          echo "INTERMEDIATE_SCHEMA=intermediate" >> $GITHUB_ENV
+          echo "MART_SCHEMA=mart" >> $GITHUB_ENV
+
+      # ----------------------------
+      # Run ETL
+      # ----------------------------
+      - name: Run ETL
+        if: >
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.run_etl == 'true') ||
+          github.event_name == 'schedule' ||
+          github.event_name == 'push'
+        run: |
+          echo "Running ETL for $APP_ENV"
+          python -m scripts.run_pipeline
+
+      # ----------------------------
+      # Run dbt
+      # ----------------------------
+      - name: Run dbt
+        if: >
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.run_dbt == 'true') ||
+          github.event_name == 'schedule' ||
+          github.event_name == 'push'
+        run: |
+          echo "Running dbt for $APP_ENV"
+          dbt run --profiles-dir dbt --project-dir dbt --target $APP_ENV
