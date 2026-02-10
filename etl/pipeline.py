@@ -45,6 +45,19 @@ def run_etl() -> None:
         json_cols=["data"],
     )
 
+    fixtures_df = prepare_load_df(
+    fixtures_df,
+    json_cols=["stats"],
+    int_cols=[
+        "event",
+        "minutes",
+        "team_a",
+        "team_h",
+        "team_h_difficulty",
+        "team_a_difficulty",
+        ],
+    )
+
     # --------------------
     # Load: bootstrap_static
     # --------------------
